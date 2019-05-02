@@ -12,6 +12,7 @@ from collections import Counter
 import itertools
 from itertools import takewhile
 import json
+import pickle
 
 class VQADataset(data.dataset.Dataset):
   def __init__(self, split):
@@ -31,12 +32,15 @@ class VQADataset(data.dataset.Dataset):
     self.split = split
     self.imgDir = imgDir
 
+    print(annFile, quesFile)
+
     # Initialize VQA API
     vqa = VQA(annFile, quesFile)
     self.vqa = vqa
     
-    img_ids = vqa.getImgIds() # get all
-    self.img_ids = img_ids
+    #img_ids = vqa.getImgIds() # get all
+    #self.img_ids = img_ids
+    self.question_ids = vqa.getQuesIds() # get all
     
     imagenet_mean = [0.485, 0.456, 0.406]
     imagenet_std = [0.229, 0.224, 0.225]
@@ -60,6 +64,13 @@ class VQADataset(data.dataset.Dataset):
       print('Computing top K answers')
       top_answers = self.get_top_k_answers(all_answers, 3000)
       self.top_answers = top_answers
+      self.inverse_top_answers = {v: k for k, v in top_answers.items()}
+      feature_file = open('train.pickle', 'rb')
+      self.img_features = pickle.load(feature_file)
+  
+    if self.split == 'val':
+      feature_file = open('val.pickle', 'rb')
+      self.img_features = pickle.load(feature_file)
 
   def get_embedding_dim(self):
     return len(self.all_letters) + 1
@@ -93,14 +104,16 @@ class VQADataset(data.dataset.Dataset):
   def __getitem__(self, index):
     has_answered = False
     while not has_answered:
-      img_id = self.img_ids[index]
-      question_ids = self.vqa.getQuesIds(imgIds=img_id)
-      question_id = random.sample(question_ids, 1)[0]
+      question_id = self.question_ids[index]
+      img_id = self.vqa.getImgIds(quesIds=question_id)[0]
       answer_dict = self.vqa.loadQA(question_id)[0]
-      imgFilename = 'COCO_' + self.dataSubType + '_'+ str(img_id).zfill(12) + '.jpg'
-      imgFilename = os.path.join(self.imgDir, imgFilename)
-      color = Image.open(imgFilename).convert('RGB')
-      color = self.transform(color)
+
+      color = self.img_features[img_id] # 2048
+      
+      #imgFilename = 'COCO_' + self.dataSubType + '_'+ str(img_id).zfill(12) + '.jpg'
+      #imgFilename = os.path.join(self.imgDir, imgFilename)
+      #color = Image.open(imgFilename).convert('RGB')
+      #color = self.transform(color)
     
       nontoken_answers = self.tokenize_answer(answer_dict)
       occurence_count = Counter(nontoken_answers)
@@ -120,7 +133,7 @@ class VQADataset(data.dataset.Dataset):
     return color, question, question_id, length
     
   def __len__(self):
-    return len(self.img_ids)
+    return len(self.question_ids)
 
 if __name__ == '__main__':
   dataset = VQADataset(split='train')

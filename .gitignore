@@ -1,1 +1,4 @@
 *.pdf
+*/__pycache__
+*.pyc
+writeup/
