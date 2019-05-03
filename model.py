@@ -22,7 +22,6 @@ class LSTM(nn.Module):
 class Classifier(nn.Module):
   def __init__(self, vocab_size, embedding_dim, hidden_dim, dim_input, dim_output, top_ans):
     super(Classifier, self).__init__()
-    #self.resnet = torchvision.models.resnet101(pretrained=True)
     self.lstm = LSTM(vocab_size=vocab_size, embedding_dim=embedding_dim, hidden_dim=hidden_dim)
     self.fc = nn.Sequential(
                     nn.Dropout(0.25),
@@ -34,5 +33,5 @@ class Classifier(nn.Module):
   def forward(self, images, questions, lengths):
     x = images
     y = self.lstm(questions, lengths)
-    z = x * y
+    z = x+y
     return self.fc(z)
